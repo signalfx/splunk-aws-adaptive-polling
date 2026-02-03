@@ -1,4 +1,4 @@
-# Enables adaptive polling by setting the `coldPollRate` for eligible AWSCloudWatch integrations.
+Enables adaptive polling by setting the `coldPollRate` for eligible AWSCloudWatch integrations.
 
 ## What it does
 1) GETs all AWSCloudWatch integrations from the provided domain.
