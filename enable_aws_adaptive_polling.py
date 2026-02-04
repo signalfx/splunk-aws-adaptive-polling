@@ -27,6 +27,24 @@ def http_request(method, url, token, body=None):
         raise RuntimeError(f"Request failed for {url}: {e}") from e
 
 
+def print_table(rows):
+    if not rows:
+        return
+    id_width = max(len(rid) for rid, _ in rows)
+    print(f"{'ID'.ljust(id_width)}  NAME")
+    print(f"{'-' * id_width}  {'-' * 4}")
+    for rid, name in rows:
+        print(f"{rid.ljust(id_width)}  {name if name is not None else ''}")
+
+
+def print_updated(rows):
+    if rows:
+        print(f"Updated {len(rows)} integrations:")
+        print_table(rows)
+        return
+    print("Updated 0 integrations")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Enable adaptive polling for eligible AWSCloudWatch integrations."
@@ -61,13 +79,13 @@ def main():
     if args.coldPollRateMinutes < 1 or args.coldPollRateMinutes > 20:
         parser.error("--coldPollRateMinutes must be in range 1-20")
 
-    base = f"https://{args.domainName}"
+    base = f"http://{args.domainName}"
     list_url = f"{base}/v2/integration?type=AWSCloudWatch"
 
     _, payload = http_request("GET", list_url, args.apiToken)
     results = payload.get("results", []) if isinstance(payload, dict) else []
     print(
-        f"Found {len(results)} integrations of type AWSCloudWatch"
+        f"Found {len(results)} integrations of type AWSCloudWatch."
     )
     candidates = []
     filtered_disabled = []
@@ -115,13 +133,10 @@ def main():
             f"{', '.join(filtered_streaming)}"
         )
     if remaining:
-        print(f"{len(remaining_ids)} integrations queued for update: ")
-        id_width = max(len(rid) for rid, _ in remaining)
-        print(f"{'ID'.ljust(id_width)}  NAME")
-        print(f"{'-' * id_width}  {'-' * 4}")
-        for rid, name in remaining:
-            print(f"{rid.ljust(id_width)}  {name if name is not None else ''}")
-        reply = input("Proceed with PUT updates? [y/N]: ").strip().lower()
+        print(f"\n{len(remaining_ids)} integrations queued for update: ")
+        print_table(remaining)
+        reply = input("\nProceed with updates? [y/N]: ").strip().lower()
+        print()
         if reply not in ("y", "yes"):
             print("Aborted. No updates performed.")
             return
@@ -129,22 +144,29 @@ def main():
         print("No integrations meet the provided criteria. No updates performed.")
         return
 
-    updated_ids = []
-    for item in candidates:
-        integ_id = item.get("id")
-        if not integ_id:
-            continue
-        body = dict(item)
-        body["coldPollRate"] = args.coldPollRateMinutes * 60000
-        put_url = f"{base}/v2/integration/{integ_id}"
-        status, _ = http_request("PUT", put_url, args.apiToken, body=body)
-        if 200 <= status < 300:
-            updated_ids.append(integ_id)
+    updated = []
+    update_error = None
+    try:
+        for item in candidates:
+            integ_id = item.get("id")
+            if not integ_id:
+                continue
+            body = dict(item)
+            body["coldPollRate"] = args.coldPollRateMinutes * 60000
+            put_url = f"{base}/v2/integration/{integ_id}"
+            http_request("PUT", put_url, args.apiToken, body=body)
+            updated.append((integ_id, item.get("name")))
+    except Exception as exc:
+        update_error = exc
+        raise
+    finally:
+        if update_error is not None:
+            print(
+                "Update FAILED before completion."
+            )
+            print_updated(updated)
 
-    if updated_ids:
-        print(f"Updated {len(updated_ids)} integrations: {', '.join(updated_ids)}")
-    else:
-        print("Updated 0 integrations")
+    print_updated(updated)
 
 
 if __name__ == "__main__":
