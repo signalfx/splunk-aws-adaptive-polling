@@ -122,7 +122,7 @@ def main():
     if args.coldPollRateMinutes < 1 or args.coldPollRateMinutes > 20:
         parser.error("--coldPollRateMinutes must be in range 1-20")
 
-    base = f"http://{args.domainName}"
+    base = f"https://{args.domainName}"
     list_url = f"{base}/v2/integration?type=AWSCloudWatch"
 
     _, payload = http_request("GET", list_url, args.apiToken)
