@@ -104,7 +104,7 @@ def main():
         type=int,
         default=15,
         metavar="minutes",
-        help="cold poll rate to set, allowed range 1-20 minutes (default: 15)",
+        help="cold poll rate to set (default: 15)",
     )
     parser.add_argument(
         "--includeDisabled",
@@ -119,8 +119,8 @@ def main():
         help="override cold poll rate for integrations which already have adaptive polling configured (default: false)",
     )
     args = parser.parse_args()
-    if args.coldPollRateMinutes < 1 or args.coldPollRateMinutes > 20:
-        parser.error("--coldPollRateMinutes must be in range 1-20")
+    if args.coldPollRateMinutes < 1:
+        parser.error("--coldPollRateMinutes must be a positive value")
 
     base = f"https://{args.domainName}"
     list_url = f"{base}/v2/integration?type=AWSCloudWatch"
