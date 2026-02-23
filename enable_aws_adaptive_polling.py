@@ -41,11 +41,11 @@ def format_minutes(value, missing_label=None):
     return str(round(numeric, 2))
 
 
-def print_table(rows, show_cold_poll_rate, missing_label=None):
+def print_table(rows, show_inactive_metrics_poll_rate, missing_label=None):
     if not rows:
         return
-    if show_cold_poll_rate:
-        headers = ("ID", "NAME", "COLD_POLL_RATE")
+    if show_inactive_metrics_poll_rate:
+        headers = ("ID", "NAME", "INACTIVE_METRICS_POLL_RATE")
         id_width = max(len(headers[0]), *(len(rid) for rid, _, _ in rows))
         name_width = max(len(headers[1]), *(len(name or "") for _, name, _ in rows))
         minutes_width = max(
@@ -75,14 +75,14 @@ def print_table(rows, show_cold_poll_rate, missing_label=None):
         )
 
 
-def print_updated(rows, total_expected, show_cold_poll_rate, target_minutes):
+def print_updated(rows, total_expected, show_inactive_metrics_poll_rate, target_minutes):
     if total_expected and len(rows) == total_expected:
         print("All updates succeeded. Adaptive polling is enabled and set to " f"{target_minutes} minutes")
         return
     if rows:
         suffix = "s" if len(rows) != 1 else ""
         print(f"Updated {len(rows)} integration{suffix}:")
-        print_table(rows, show_cold_poll_rate)
+        print_table(rows, show_inactive_metrics_poll_rate)
         return
     print("Updated 0 integrations")
 
@@ -100,11 +100,11 @@ def main():
     parser.add_argument("apiToken",
                         help="API token, found on UI in: [My Profile -> Show User API Access Token] OR [Settings -> Access Tokens]")
     parser.add_argument(
-        "--coldPollRateMinutes",
+        "--inactiveMetricsPollRateMinutes",
         type=int,
         default=15,
         metavar="minutes",
-        help="cold poll rate to set (default: 15)",
+        help="inactive metrics poll rate to set (default: 15)",
     )
     parser.add_argument(
         "--includeDisabled",
@@ -116,11 +116,11 @@ def main():
         "--overrideExisting",
         action="store_true",
         default=False,
-        help="override cold poll rate for integrations which already have adaptive polling configured (default: false)",
+        help="override inactive metrics poll rate for integrations which already have adaptive polling configured (default: false)",
     )
     args = parser.parse_args()
-    if args.coldPollRateMinutes < 1:
-        parser.error("--coldPollRateMinutes must be a positive value")
+    if args.inactiveMetricsPollRateMinutes < 1:
+        parser.error("--inactiveMetricsPollRateMinutes must be a positive value")
 
     base = f"https://{args.domainName}"
     list_url = f"{base}/v2/integration?type=AWSCloudWatch"
@@ -131,7 +131,7 @@ def main():
     print(f"Found {len(results)} integration{suffix} of type AWSCloudWatch.")
     candidates = []
     filtered_disabled = []
-    filtered_cold_poll = []
+    filtered_inactive_metrics_poll = []
     filtered_streaming = []
     for item in results:
         if not isinstance(item, dict):
@@ -141,10 +141,10 @@ def main():
             if integ_id:
                 filtered_disabled.append(integ_id)
             continue
-        if not args.overrideExisting and "coldPollRate" in item and item.get("coldPollRate") is not None:
+        if not args.overrideExisting and "inactiveMetricsPollRate" in item and item.get("inactiveMetricsPollRate") is not None:
             integ_id = item.get("id")
             if integ_id:
-                filtered_cold_poll.append(integ_id)
+                filtered_inactive_metrics_poll.append(integ_id)
             continue
         if item.get("metricStreamsSyncState") == "ENABLED":
             integ_id = item.get("id")
@@ -154,7 +154,7 @@ def main():
         candidates.append(item)
 
     remaining = [
-        (item.get("id"), item.get("name"), item.get("coldPollRate"))
+        (item.get("id"), item.get("name"), item.get("inactiveMetricsPollRate"))
         for item in candidates
         if item.get("id")
     ]
@@ -164,10 +164,10 @@ def main():
             f"Filtered out disabled integrations ({len(filtered_disabled)}): "
             f"{', '.join(filtered_disabled)}"
         )
-    if not args.overrideExisting and filtered_cold_poll:
+    if not args.overrideExisting and filtered_inactive_metrics_poll:
         print(
-            f"Filtered out integrations with cold poll rate already set ({len(filtered_cold_poll)}): "
-            f"{', '.join(filtered_cold_poll)}"
+            f"Filtered out integrations with inactive metrics poll rate already set ({len(filtered_inactive_metrics_poll)}): "
+            f"{', '.join(filtered_inactive_metrics_poll)}"
         )
     if filtered_streaming:
         print(
@@ -195,19 +195,19 @@ def main():
             if not integ_id:
                 continue
             body = dict(item)
-            body["coldPollRate"] = args.coldPollRateMinutes * 60000
+            body["inactiveMetricsPollRate"] = args.inactiveMetricsPollRateMinutes * 60000
             put_url = f"{base}/v2/integration/{integ_id}"
             http_request("PUT", put_url, args.apiToken, body=body)
-            updated.append((integ_id, item.get("name"), args.coldPollRateMinutes))
+            updated.append((integ_id, item.get("name"), args.inactiveMetricsPollRateMinutes))
     except Exception as exc:
         update_error = exc
         raise
     finally:
         if update_error is not None:
             print("Update FAILED before completion.")
-            print_updated(updated, len(candidates), args.overrideExisting, args.coldPollRateMinutes,)
+            print_updated(updated, len(candidates), args.overrideExisting, args.inactiveMetricsPollRateMinutes,)
 
-    print_updated(updated, len(candidates), args.overrideExisting, args.coldPollRateMinutes, )
+    print_updated(updated, len(candidates), args.overrideExisting, args.inactiveMetricsPollRateMinutes, )
 
 
 if __name__ == "__main__":
