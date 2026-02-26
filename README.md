@@ -20,7 +20,7 @@ python enable_aws_adaptive_polling.py \
 ## Arguments
 - `domainName` (required): Full domain name, e.g. `app.us0.signalfx.com`.
 - `apiToken` (required): SignalFx API token.
-- `--inactiveMetricsPollRateMinutes` (optional, default `15`): Sets `inactiveMetricsPollRate` in minutes (1–20).
+- `--inactiveMetricsPollRateMinutes` (optional, default `15`): Sets `inactiveMetricsPollRate` in minutes (1–60).
 - `--includeDisabled` (optional): Include disabled integrations.
 - `--overrideExisting` (optional): Update even if `inactiveMetricsPollRate` is already set.
 
